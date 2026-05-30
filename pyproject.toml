@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "resume-agent"
+version = "0.1.0"
+description = "Interactive CLI for generating tailored co-op resume application artifacts."
+requires-python = ">=3.10"
+dependencies = []
+
+[project.scripts]
+resume-agent = "resume_agent.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["resume_agent*"]

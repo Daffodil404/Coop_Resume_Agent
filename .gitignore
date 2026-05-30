@@ -1,0 +1,29 @@
+# Python caches and local tooling
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+
+# Local and temporary files
+.DS_Store
+.tmp/
+
+# Environment and secret files
+.env
+.env.*
+
+# Generated application outputs
+applications/*
+!applications/.gitkeep
+
+# Private local user data
+data/private/
+
+# LaTeX and PDF build artifacts
+*.pdf
+*.aux
+*.log
+*.out
+*.toc
