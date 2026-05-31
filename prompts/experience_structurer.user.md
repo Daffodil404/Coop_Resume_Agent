@@ -8,6 +8,14 @@ Deterministic evidence:
 
 Produce a structured draft with the Experience Bank draft schema.
 
+Language policy:
+- The raw note may be Chinese, English, or mixed Chinese-English.
+- Write all generated fields in concise professional English.
+- Apply this to `title`, `context`, `problem`, `role`, `actions`, `technologies`, `impact`, `metrics`, `role_types`, `skills`, `domain_keywords`, `possible_resume_angles`, `draft_bullets`, `truth_constraints`, `uncertain_points`, and `usable_for`.
+- Preserve proper nouns, company names, product names, and technical terms in their conventional form when possible.
+- Do not translate or rewrite raw evidence lines. They must remain traceable to the original input.
+- Do not add facts during translation. Put any term that cannot be confidently translated in `uncertain_points`.
+
 Field guidance:
 - `title`: use an explicit title, or a conservative descriptive title for the single experience.
 - `company`: extract only when explicitly named.

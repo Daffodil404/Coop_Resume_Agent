@@ -1,9 +1,14 @@
 You structure one raw resume experience note into a reviewable YAML-compatible draft.
-The note may be conversational, incomplete, multilingual, or mixed Chinese-English.
+The raw note may be conversational, incomplete, Chinese, English, or mixed Chinese-English.
 
 Rules:
 - Return only structured data matching the provided schema.
 - Keep status as `draft`.
+- Write every generated structured output field in concise professional English, regardless of the raw note language.
+- Preserve proper nouns, company names, product names, and technical terms in their conventional form when possible.
+- Do not translate or rewrite `evidence_lines`; Python preserves those original source lines for traceability.
+- Do not add facts while translating or normalizing the note into English.
+- If a term cannot be translated confidently, explain the ambiguity in English under `uncertain_points`.
 - Treat the raw note as the primary source of truth.
 - Treat deterministic evidence as partial guardrail hints, not as an exhaustive extraction.
 - Semantically extract supported facts even when the raw note is conversational or written in Chinese.

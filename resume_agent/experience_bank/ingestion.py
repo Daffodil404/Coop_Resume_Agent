@@ -53,17 +53,21 @@ class RuleBasedExperienceStructurer:
         extracted_evidence = evidence or EvidenceExtractor().extract(clean_note)
         lines = extracted_evidence.evidence_lines
         searchable_text = " ".join(lines)
-        title = _extract_labeled_value(lines, ("title", "project", "experience"))
-        company = _extract_labeled_value(lines, ("company", "employer", "organization"))
+        title = _english_safe_value(_extract_labeled_value(lines, ("title", "project", "experience")))
+        company = _english_safe_value(_extract_labeled_value(lines, ("company", "employer", "organization")))
         time_period = _extract_time_period(searchable_text)
-        actions = extracted_evidence.action_lines
-        impact = extracted_evidence.impact_lines
-        metrics = extracted_evidence.metric_lines
+        actions = _english_safe_lines(extracted_evidence.action_lines)
+        impact = _english_safe_lines(extracted_evidence.impact_lines)
+        metrics = _english_safe_lines(extracted_evidence.metric_lines)
         technologies = extracted_evidence.technologies
         role_types = _infer_categories(searchable_text, ROLE_TYPE_RULES)
         skills = _infer_categories(searchable_text, SKILL_RULES)
         domain_keywords = _infer_categories(searchable_text, DOMAIN_RULES)
         uncertain_points = _build_uncertain_points(title, company, time_period, actions, impact)
+        if any(not _is_english_safe(line) for line in extracted_evidence.evidence_lines):
+            uncertain_points.append(
+                "Review the original non-English evidence lines with the AI structurer or translate them manually."
+            )
 
         draft = ExperienceDraft(
             id=draft_id,
@@ -77,9 +81,9 @@ class RuleBasedExperienceStructurer:
             title=title,
             company=company,
             time_period=time_period,
-            context=_extract_labeled_value(lines, ("context", "background")),
-            problem=_extract_labeled_value(lines, ("problem", "challenge")),
-            role=_extract_labeled_value(lines, ("role", "position")),
+            context=_english_safe_value(_extract_labeled_value(lines, ("context", "background"))),
+            problem=_english_safe_value(_extract_labeled_value(lines, ("problem", "challenge"))),
+            role=_english_safe_value(_extract_labeled_value(lines, ("role", "position"))),
             actions=actions,
             technologies=technologies,
             impact=impact,
@@ -89,8 +93,8 @@ class RuleBasedExperienceStructurer:
             domain_keywords=domain_keywords,
             possible_resume_angles=_build_resume_angles(role_types, skills),
             evidence=DraftEvidence(
-                action_lines=actions,
-                metric_lines=metrics,
+                action_lines=extracted_evidence.action_lines,
+                metric_lines=extracted_evidence.metric_lines,
                 technology_lines=extracted_evidence.technology_lines,
             ),
             evidence_lines=lines,
@@ -140,6 +144,18 @@ def _extract_time_period(text: str) -> str | None:
         re.IGNORECASE,
     )
     return match.group(0) if match else None
+
+
+def _english_safe_value(value: str | None) -> str | None:
+    return value if value is not None and _is_english_safe(value) else None
+
+
+def _english_safe_lines(lines: list[str]) -> list[str]:
+    return [line for line in lines if _is_english_safe(line)]
+
+
+def _is_english_safe(value: str) -> bool:
+    return value.isascii()
 
 
 def _infer_categories(text: str, rules: dict[str, tuple[str, ...]]) -> list[str]:

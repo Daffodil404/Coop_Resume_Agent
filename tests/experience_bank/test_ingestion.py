@@ -69,6 +69,26 @@ class IngestionTests(unittest.TestCase):
         self.assertEqual(draft["source"]["structurer"], "rule_based")
         self.assertEqual(draft["technologies"], ["Python", "REST"])
 
+    def test_local_fallback_keeps_non_english_text_only_as_evidence(self) -> None:
+        raw_line = "使用 Vue 实现了 landing page，并优化了组件结构。"
+        draft = RuleBasedExperienceStructurer().structure(
+            raw_note=(
+                "Company: Cosnex\n"
+                f"{raw_line}\n"
+                "The component supported the frontend workflow."
+            ),
+            draft_id="experience_test",
+        )
+
+        self.assertEqual(draft["company"], "Cosnex")
+        self.assertEqual(draft["technologies"], ["Vue"])
+        self.assertEqual(draft["actions"], [])
+        self.assertIn(raw_line, draft["evidence_lines"])
+        self.assertIn(
+            "Review the original non-English evidence lines with the AI structurer or translate them manually.",
+            draft["uncertain_points"],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
