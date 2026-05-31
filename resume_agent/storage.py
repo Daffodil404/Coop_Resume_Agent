@@ -74,6 +74,14 @@ def save_application_artifacts(
     write_json(application_dir / "metadata.json", metadata)
 
 
+def save_resume_selection(application_dir: Path, selection: dict[str, Any]) -> None:
+    write_json(application_dir / "resume_selection.json", selection)
+
+
+def save_resume_strategy(application_dir: Path, strategy: dict[str, Any]) -> None:
+    write_json(application_dir / "resume_strategy.json", strategy)
+
+
 def write_text(path: Path, value: str) -> None:
     path.write_text(value, encoding="utf-8")
 
