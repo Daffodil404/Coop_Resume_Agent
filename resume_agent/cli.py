@@ -7,6 +7,7 @@ from .ai_client import AIClient
 from .config import get_resume_root
 from .cover_letter import decide_cover_letter
 from .cover_letter_draft import render_cover_letter_draft
+from .experience_bank.cli import run_experience_ingest
 from .jd import clean_jd_text
 from .mock_ai import MockAIClient
 from .mock_resume_strategy import MockResumeStrategyClient
@@ -120,6 +121,12 @@ def run_cover_letter_draft_generation(
 
 
 def main() -> int:
+    if sys.argv[1:] == ["experience", "ingest"]:
+        return run_experience_ingest()
+    if sys.argv[1:]:
+        print("Usage: resume-agent [experience ingest]", file=sys.stderr)
+        return 2
+
     raw_jd = read_jd_from_stdin()
     if not raw_jd.strip():
         print("No Job Description received. Nothing was generated.", file=sys.stderr)

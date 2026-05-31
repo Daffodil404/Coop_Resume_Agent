@@ -7,7 +7,7 @@ name = "resume-agent"
 version = "0.1.0"
 description = "Interactive CLI for generating tailored co-op resume application artifacts."
 requires-python = ">=3.10"
-dependencies = ["Jinja2>=3.1"]
+dependencies = ["Jinja2>=3.1", "PyYAML>=6.0"]
 
 [project.scripts]
 resume-agent = "resume_agent.cli:main"

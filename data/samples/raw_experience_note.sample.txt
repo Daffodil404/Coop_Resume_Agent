@@ -1,0 +1,8 @@
+Title: Inventory Dashboard Project
+Company: Sample Retail Lab
+Role: Student Developer
+Time period: January 2025 - April 2025
+
+Built a small React and Python dashboard to display inventory data from a SQL database.
+Collaborated with a two-person student team to clarify requirements and test the workflow.
+Created a basic deployment checklist and documented unresolved questions for future work.
