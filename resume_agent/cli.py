@@ -5,6 +5,9 @@ from pathlib import Path
 
 from .ai_client import AIClient
 from .config import get_resume_root
+from .cover_letter import decide_cover_letter
+from .cover_letter_draft import render_cover_letter_draft
+from .experience_bank.cli import run_experience_ingest
 from .jd import clean_jd_text
 from .mock_ai import MockAIClient
 from .mock_resume_strategy import MockResumeStrategyClient
@@ -14,16 +17,22 @@ from .storage import (
     create_application_metadata,
     current_utc_time,
     save_application_artifacts,
+    save_cover_letter_decision,
+    save_cover_letter_generation,
     save_resume_strategy,
     save_resume_selection,
 )
 
 
-def read_jd_from_stdin() -> str:
+def read_jd_from_stdin() -> str | None:
     print("Paste the full Job Description below.")
     print("When you are done, press Ctrl-D on a new line to start analysis.")
     print()
-    return sys.stdin.read()
+    try:
+        return sys.stdin.read()
+    except KeyboardInterrupt:
+        print("\nJob description ingestion cancelled.", file=sys.stderr)
+        return None
 
 
 def print_analysis_summary(analysis: dict[str, object]) -> None:
@@ -70,8 +79,61 @@ def print_resume_selection_summary(selection: dict[str, object]) -> None:
     print()
 
 
+def run_cover_letter_decision(
+    application_dir: Path,
+    jd_analysis: dict[str, object],
+    resume_strategy: dict[str, object],
+    resume_selection: dict[str, object],
+) -> dict[str, object]:
+    decision = decide_cover_letter(jd_analysis, resume_strategy, resume_selection)
+    save_cover_letter_decision(application_dir, decision)
+    print_cover_letter_decision_summary(decision)
+    return decision
+
+
+def print_cover_letter_decision_summary(decision: dict[str, object]) -> None:
+    print()
+    print("Cover letter decision")
+    print(f"Recommendation: {decision['recommendation']}")
+    print(f"Generate cover letter: {'Yes' if decision['should_generate'] else 'No'}")
+    print(f"Reason: {decision['reason']}")
+    if decision.get("suggested_angle"):
+        print(f"Suggested angle: {decision['suggested_angle']}")
+    print()
+
+
+def run_cover_letter_draft_generation(
+    application_dir: Path,
+    jd_analysis: dict[str, object],
+    resume_strategy: dict[str, object],
+    cover_letter_decision: dict[str, object],
+) -> dict[str, object]:
+    generation = render_cover_letter_draft(
+        jd_analysis=jd_analysis,
+        resume_strategy=resume_strategy,
+        cover_letter_decision=cover_letter_decision,
+        output_path=application_dir / "cover_letter.tex",
+    )
+    save_cover_letter_generation(application_dir, generation)
+    if generation["generated"]:
+        print(f"Generated editable cover letter draft: {generation['output_path']}")
+        print("Cover letter generation mode: template_based_mock")
+    else:
+        print("Cover letter generation skipped.")
+    print()
+    return generation
+
+
 def main() -> int:
+    if sys.argv[1:] == ["experience", "ingest"]:
+        return run_experience_ingest()
+    if sys.argv[1:]:
+        print("Usage: resume-agent [experience ingest]", file=sys.stderr)
+        return 2
+
     raw_jd = read_jd_from_stdin()
+    if raw_jd is None:
+        return 130
     if not raw_jd.strip():
         print("No Job Description received. Nothing was generated.", file=sys.stderr)
         return 1
@@ -107,11 +169,24 @@ def main() -> int:
     )
     resume_strategy = MockResumeStrategyClient().create_strategy(analysis)
     save_resume_strategy(application_dir, resume_strategy)
-    run_resume_selection(application_dir, resume_strategy)
+    resume_selection = run_resume_selection(application_dir, resume_strategy)
+    cover_letter_decision = run_cover_letter_decision(
+        application_dir,
+        analysis,
+        resume_strategy,
+        resume_selection,
+    )
+    run_cover_letter_draft_generation(
+        application_dir,
+        analysis,
+        resume_strategy,
+        cover_letter_decision,
+    )
 
     print(f"Created application draft: {application_dir}")
     print(
         "Generated: jd_raw.txt, jd_clean.txt, jd_analysis.json, metadata.json, "
-        "resume_strategy.json, resume_selection.json"
+        "resume_strategy.json, resume_selection.json, cover_letter_decision.json, "
+        "cover_letter_generation.json"
     )
     return 0
