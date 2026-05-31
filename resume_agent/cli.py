@@ -24,11 +24,15 @@ from .storage import (
 )
 
 
-def read_jd_from_stdin() -> str:
+def read_jd_from_stdin() -> str | None:
     print("Paste the full Job Description below.")
     print("When you are done, press Ctrl-D on a new line to start analysis.")
     print()
-    return sys.stdin.read()
+    try:
+        return sys.stdin.read()
+    except KeyboardInterrupt:
+        print("\nJob description ingestion cancelled.", file=sys.stderr)
+        return None
 
 
 def print_analysis_summary(analysis: dict[str, object]) -> None:
@@ -128,6 +132,8 @@ def main() -> int:
         return 2
 
     raw_jd = read_jd_from_stdin()
+    if raw_jd is None:
+        return 130
     if not raw_jd.strip():
         print("No Job Description received. Nothing was generated.", file=sys.stderr)
         return 1

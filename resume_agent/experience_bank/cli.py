@@ -18,7 +18,11 @@ def run_experience_ingest(data_root: Path = Path(".")) -> int:
     print("- target roles this experience may support")
     print("When you are done, press Ctrl-D on a new line to create a YAML draft.")
     print()
-    raw_note = sys.stdin.read()
+    try:
+        raw_note = sys.stdin.read()
+    except KeyboardInterrupt:
+        print("\nExperience ingestion cancelled.", file=sys.stderr)
+        return 130
     try:
         validate_raw_experience_note(raw_note)
     except ValueError as error:

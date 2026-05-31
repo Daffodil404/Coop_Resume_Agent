@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sys
 import unittest
-from contextlib import redirect_stdout
+from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -38,6 +38,25 @@ class ExperienceIngestCLITests(unittest.TestCase):
         self.assertIn("truth constraints / what not to exaggerate", terminal_output)
         self.assertIn("target roles this experience may support", terminal_output)
         self.assertIn("Draft was not merged", terminal_output)
+
+    def test_ctrl_c_cancels_without_traceback_or_files(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir)
+            stdout = StringIO()
+            stderr = StringIO()
+            interrupted_stdin = StringIO()
+            with patch.object(interrupted_stdin, "read", side_effect=KeyboardInterrupt):
+                with patch.object(sys, "stdin", interrupted_stdin):
+                    with redirect_stdout(stdout):
+                        with redirect_stderr(stderr):
+                            exit_code = run_experience_ingest(data_root=data_root)
+
+            private_data_dir = data_root / "data/private"
+
+        self.assertEqual(exit_code, 130)
+        self.assertFalse(private_data_dir.exists())
+        self.assertIn("Experience ingestion cancelled.", stderr.getvalue())
+        self.assertNotIn("Traceback", stderr.getvalue())
 
 
 if __name__ == "__main__":
