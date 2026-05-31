@@ -6,6 +6,7 @@ from typing import Any
 
 import yaml
 
+from .validator import validate_experience_draft
 
 RAW_NOTES_DIR = Path("data/private/raw_experience_notes")
 EXPERIENCE_DRAFTS_DIR = Path("data/private/experience_drafts")
@@ -22,6 +23,7 @@ def save_experience_draft(
     data_root: Path = Path("."),
 ) -> dict[str, str]:
     """Save raw and YAML draft files without merging into a final bank."""
+    validate_experience_draft(structured_draft)
     raw_notes_dir = data_root / RAW_NOTES_DIR
     drafts_dir = data_root / EXPERIENCE_DRAFTS_DIR
     raw_notes_dir.mkdir(parents=True, exist_ok=True)

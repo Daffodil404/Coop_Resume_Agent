@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 
 import yaml
 
+from resume_agent.experience_bank.ingestion import RuleBasedExperienceStructurer
 from resume_agent.experience_bank.storage import save_experience_draft
 
 
@@ -13,9 +14,17 @@ class StorageTests(unittest.TestCase):
     def test_saves_raw_note_and_yaml_draft_under_private_data(self) -> None:
         with TemporaryDirectory() as temp_dir:
             data_root = Path(temp_dir)
+            raw_note = (
+                "Title: Sample\n"
+                "Company: Sample Lab\n"
+                "Built a Python REST API and tested the workflow with a team.\n"
+            )
             paths = save_experience_draft(
-                raw_note="A sufficiently detailed fake raw experience note.",
-                structured_draft={"id": "experience_test", "title": "Sample"},
+                raw_note=raw_note,
+                structured_draft=RuleBasedExperienceStructurer().structure(
+                    raw_note,
+                    draft_id="experience_test",
+                ),
                 data_root=data_root,
             )
             raw_path = Path(paths["raw_note_path"])
