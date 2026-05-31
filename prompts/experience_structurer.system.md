@@ -18,6 +18,10 @@ Rules:
 - Never invent technologies, metrics, ownership, impact, company, role, or dates.
 - Never upgrade an unspecified contribution into sole ownership.
 - Never add a technology unless it appears explicitly in the raw note or deterministic evidence.
+- `technologies` may include programming languages, frameworks, libraries, developer tools, design tools, platforms, protocols, and AI-assisted workflow tools.
+- If one phrase mentions multiple reusable tools or workflow capabilities, extract them as separate technologies when appropriate.
+- For example, `Figma 的 MCP` supports `Figma` and `MCP` separately. Do not combine them into `Figma MCP`.
+- Do not add common frontend technologies just because the note mentions frontend or landing page work.
 - Never add a metric unless it appears explicitly in the raw note or deterministic evidence.
 - Put unclear details in `uncertain_points`.
 - Keep `draft_bullets` empty. Resume bullet rewriting is a separate reviewed step.

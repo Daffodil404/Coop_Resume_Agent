@@ -148,7 +148,7 @@ class PipelineTests(unittest.TestCase):
         raw_note = (
             "Title: Landing Page\n"
             "Company: Sample Lab\n"
-            "Used Figma to implement and refine the frontend landing page.\n"
+            "Used CustomTool to implement and refine the frontend landing page.\n"
         )
         local_draft = RuleBasedExperienceStructurer().structure(
             raw_note,
@@ -156,7 +156,7 @@ class PipelineTests(unittest.TestCase):
         )
         local_draft["source"]["structurer"] = "openai"
         local_draft["source"]["model"] = "fake-model"
-        local_draft["technologies"].append("Figma")
+        local_draft["technologies"].append("CustomTool")
         with TemporaryDirectory() as temp_dir:
             local_keywords_path = Path(temp_dir) / "technologies.local.json"
             with patch.dict(
@@ -175,18 +175,18 @@ class PipelineTests(unittest.TestCase):
 
             saved_keywords = local_keywords_path.read_text(encoding="utf-8")
 
-        self.assertEqual(draft["technologies"], ["Figma"])
-        self.assertIn("Figma", saved_keywords)
+        self.assertEqual(draft["technologies"], ["CustomTool"])
+        self.assertIn("CustomTool", saved_keywords)
         self.assertEqual(
             draft["evidence"]["technology_lines"],
-            ["Used Figma to implement and refine the frontend landing page."],
+            ["Used CustomTool to implement and refine the frontend landing page."],
         )
 
     def test_new_raw_note_technology_continues_when_dictionary_update_is_declined(self) -> None:
         raw_note = (
             "Title: Landing Page\n"
             "Company: Sample Lab\n"
-            "Used Figma to implement and refine the frontend landing page.\n"
+            "Used CustomTool to implement and refine the frontend landing page.\n"
         )
         local_draft = RuleBasedExperienceStructurer().structure(
             raw_note,
@@ -194,7 +194,7 @@ class PipelineTests(unittest.TestCase):
         )
         local_draft["source"]["structurer"] = "openai"
         local_draft["source"]["model"] = "fake-model"
-        local_draft["technologies"].append("Figma")
+        local_draft["technologies"].append("CustomTool")
         with patch.dict(
             os.environ,
             {
@@ -208,7 +208,51 @@ class PipelineTests(unittest.TestCase):
                 new_technology_handler=lambda technology: False,
             ).structure(raw_note, draft_id="experience_test")
 
-        self.assertEqual(draft["technologies"], ["Figma"])
+        self.assertEqual(draft["technologies"], ["CustomTool"])
+
+    def test_mixed_language_evidence_supports_figma_and_mcp_separately(self) -> None:
+        raw_note = (
+            "Company: Cosnex\n"
+            "This startup project focused on a frontend landing page.\n"
+            "使用了 Figma 的 MCP 来快速完成样式实现。\n"
+            "Implemented the landing page frontend, refined the layout, and optimized the code structure.\n"
+        )
+        local_draft = RuleBasedExperienceStructurer().structure(
+            raw_note,
+            draft_id="experience_test",
+        )
+        local_draft["source"]["structurer"] = "openai"
+        local_draft["source"]["model"] = "fake-model"
+        local_draft["technologies"].append("Figma MCP")
+        warnings = []
+        with patch.dict(
+            os.environ,
+            {
+                EXPERIENCE_MODE_ENV_VAR: "ai",
+                OPENAI_API_KEY_ENV_VAR: "fake-key",
+            },
+            clear=True,
+        ):
+            draft = ExperienceIngestionPipeline(
+                ai_structurer=_FakeAIStructurer(local_draft),
+                warning_handler=warnings.append,
+                new_technology_handler=lambda technology: False,
+            ).structure(raw_note, draft_id="experience_test")
+
+        self.assertIn("Figma", draft["technologies"])
+        self.assertIn("MCP", draft["technologies"])
+        self.assertNotIn("Figma MCP", draft["technologies"])
+        self.assertNotIn("React", draft["technologies"])
+        self.assertNotIn("TypeScript", draft["technologies"])
+        self.assertNotIn("Next.js", draft["technologies"])
+        self.assertNotIn("Tailwind", draft["technologies"])
+        self.assertNotIn("CSS", draft["technologies"])
+        self.assertNotIn(
+            "Removed AI-extracted technologies that were not found in the raw note: MCP",
+            draft["uncertain_points"],
+        )
+        self.assertIn("使用了 Figma 的 MCP 来快速完成样式实现。", draft["evidence"]["technology_lines"])
+        self.assertNotIn("Removed AI-extracted technologies", " ".join(warnings))
 
 
 class _FakeAIStructurer:

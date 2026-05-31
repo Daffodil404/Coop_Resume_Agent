@@ -9,6 +9,7 @@ from .evidence import (
     EvidenceExtractor,
     ExtractedEvidence,
     include_explicit_technologies,
+    split_supported_compound_technology,
     technology_is_explicitly_mentioned,
 )
 from .ingestion import RuleBasedExperienceStructurer
@@ -100,6 +101,7 @@ class ExperienceIngestionPipeline:
         evidence: ExtractedEvidence,
         evidence_extractor: EvidenceExtractor,
     ) -> ExtractedEvidence:
+        self._split_supported_compound_technologies(draft, evidence)
         new_technologies = sorted(set(draft["technologies"]) - set(evidence.technologies))
         if not new_technologies:
             return evidence
@@ -138,6 +140,20 @@ class ExperienceIngestionPipeline:
         evidence = include_explicit_technologies(evidence, clean_note, new_technologies)
         draft["evidence"]["technology_lines"] = evidence.technology_lines
         return evidence
+
+    def _split_supported_compound_technologies(
+        self,
+        draft: dict[str, object],
+        evidence: ExtractedEvidence,
+    ) -> None:
+        normalized_technologies = []
+        for technology in draft["technologies"]:
+            split_technologies = split_supported_compound_technology(technology, evidence.technologies)
+            if split_technologies:
+                normalized_technologies.extend(split_technologies)
+                continue
+            normalized_technologies.append(technology)
+        draft["technologies"] = list(dict.fromkeys(normalized_technologies))
 
     def _warn(self, message: str) -> None:
         if self.warning_handler:

@@ -98,21 +98,14 @@ def _extract_matching_lines(lines: list[str], pattern: str) -> list[str]:
 
 
 def _extract_keywords(text: str, keywords: list[str]) -> list[str]:
-    return [
-        keyword
-        for keyword in keywords
-        if re.search(rf"(?<![A-Za-z0-9+#]){re.escape(keyword)}(?![A-Za-z0-9+#])", text, re.IGNORECASE)
-    ]
+    return [keyword for keyword in keywords if technology_is_explicitly_mentioned(keyword, text)]
 
 
 def _extract_technology_lines(lines: list[str], technologies: list[str]) -> list[str]:
     return [
         line
         for line in lines
-        if any(
-            re.search(rf"(?<![A-Za-z0-9+#]){re.escape(keyword)}(?![A-Za-z0-9+#])", line, re.IGNORECASE)
-            for keyword in technologies
-        )
+        if any(technology_is_explicitly_mentioned(keyword, line) for keyword in technologies)
     ]
 
 
@@ -131,10 +124,43 @@ def include_explicit_technologies(
 
 
 def technology_is_explicitly_mentioned(technology: str, clean_note: str) -> bool:
+    pattern = technology_literal_pattern(technology)
+    normalized_note = normalize_technology_evidence_text(clean_note)
+    normalized_technology = normalize_technology_evidence_text(technology)
     return bool(
-        re.search(
-            rf"(?<![A-Za-z0-9+#]){re.escape(technology)}(?![A-Za-z0-9+#])",
-            clean_note,
-            re.IGNORECASE,
-        )
+        re.search(pattern, clean_note, re.IGNORECASE)
+        or re.search(pattern, normalized_note, re.IGNORECASE)
+        or re.search(technology_literal_pattern(normalized_technology), normalized_note, re.IGNORECASE)
     )
+
+
+def normalize_technology_evidence_text(text: str) -> str:
+    normalized = text.casefold()
+    normalized = re.sub(r"[`'\"“”‘’]", " ", normalized)
+    normalized = re.sub(r"[(){}\[\]<>:;,./\\|!?@%^&*=+-]+", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized.strip()
+
+
+def technology_literal_pattern(technology: str) -> str:
+    escaped = re.escape(technology.strip())
+    return rf"(?<![a-z0-9+#]){escaped}(?![a-z0-9+#])"
+
+
+def split_supported_compound_technology(
+    technology: str,
+    supported_technologies: list[str],
+) -> list[str]:
+    tokens = [token for token in re.split(r"\s+", technology.strip()) if token]
+    if len(tokens) < 2:
+        return []
+    supported_by_normalized = {
+        normalize_technology_evidence_text(candidate): candidate for candidate in supported_technologies
+    }
+    split_candidates = []
+    for token in tokens:
+        candidate = supported_by_normalized.get(normalize_technology_evidence_text(token))
+        if candidate is None:
+            return []
+        split_candidates.append(candidate)
+    return list(dict.fromkeys(split_candidates))

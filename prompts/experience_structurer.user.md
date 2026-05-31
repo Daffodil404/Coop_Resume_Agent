@@ -24,6 +24,10 @@ Field guidance:
 - `role`: state the contribution conservatively; do not claim sole ownership unless explicit.
 - `actions`: list supported implementation or design actions as concise factual paraphrases.
 - `technologies`: include only explicitly named technologies or tools.
+- `technologies` may include programming languages, frameworks, libraries, developer tools, design tools, platforms, protocols, and AI-assisted workflow tools.
+- If one phrase contains multiple reusable tools or capabilities, extract them separately when appropriate.
+- For example, if the raw note says `Figma 的 MCP`, extract `Figma` and `MCP` separately, not `Figma MCP`.
+- Do not add common but unmentioned frontend technologies such as React, TypeScript, Next.js, Tailwind, or CSS only because the note mentions frontend or landing page work.
 - `impact`: include only supported outcomes.
 - `metrics`: include only explicitly stated metrics.
 - `uncertain_points`: list missing details that would improve future review.
