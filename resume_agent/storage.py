@@ -82,6 +82,14 @@ def save_resume_strategy(application_dir: Path, strategy: dict[str, Any]) -> Non
     write_json(application_dir / "resume_strategy.json", strategy)
 
 
+def save_cover_letter_decision(application_dir: Path, decision: dict[str, Any]) -> None:
+    write_json(application_dir / "cover_letter_decision.json", decision)
+
+
+def save_cover_letter_generation(application_dir: Path, generation: dict[str, Any]) -> None:
+    write_json(application_dir / "cover_letter_generation.json", generation)
+
+
 def write_text(path: Path, value: str) -> None:
     path.write_text(value, encoding="utf-8")
 

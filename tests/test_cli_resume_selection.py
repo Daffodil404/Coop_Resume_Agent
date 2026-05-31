@@ -9,7 +9,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resume_agent.cli import run_resume_selection
+from resume_agent.cli import run_cover_letter_decision, run_resume_selection
 from resume_agent.config import RESUME_ROOT_ENV_VAR
 
 
@@ -42,6 +42,30 @@ class CLIResumeSelectionTests(unittest.TestCase):
         self.assertIn("Recommended resume base: ai_engineer", output.getvalue())
         self.assertIn("Matched local category: AI", output.getvalue())
         self.assertIn("Fallback used: No", output.getvalue())
+
+    def test_run_cover_letter_decision_saves_json_and_prints_summary(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            application_dir = Path(temp_dir)
+            output = StringIO()
+            with redirect_stdout(output):
+                decision = run_cover_letter_decision(
+                    application_dir=application_dir,
+                    jd_analysis={"cover_letter_required": True},
+                    resume_strategy={"recommended_resume_base": "sde"},
+                    resume_selection={
+                        "matched_category": "SDE",
+                        "selected_resume_pdf": "/tmp/resumes/SDE/latest.pdf",
+                        "fallback_used": False,
+                    },
+                )
+
+            saved_decision = json.loads(
+                (application_dir / "cover_letter_decision.json").read_text()
+            )
+
+        self.assertEqual(saved_decision, decision)
+        self.assertIn("Recommendation: required", output.getvalue())
+        self.assertIn("Generate cover letter: Yes", output.getvalue())
 
 
 if __name__ == "__main__":
