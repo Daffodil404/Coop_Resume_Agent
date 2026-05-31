@@ -87,15 +87,17 @@ def validate_experience_draft_against_evidence(
     draft: dict[str, object],
     evidence: ExtractedEvidence,
 ) -> None:
-    """Reject obvious unsupported AI or fallback claims before persistence."""
-    unsupported_technologies = sorted(set(draft["technologies"]) - set(evidence.technologies))
-    if unsupported_technologies:
+    """Reject obvious AI or fallback claims that lack deterministic evidence."""
+    technologies_without_evidence = sorted(set(draft["technologies"]) - set(evidence.technologies))
+    if technologies_without_evidence:
         raise ValueError(
-            f"Experience draft contains unsupported technologies: {', '.join(unsupported_technologies)}"
+            "Experience draft contains technologies not found in deterministic evidence: "
+            f"{', '.join(technologies_without_evidence)}"
         )
 
-    unsupported_metrics = sorted(set(draft["metrics"]) - set(evidence.metric_lines))
-    if unsupported_metrics:
+    metrics_without_evidence = sorted(set(draft["metrics"]) - set(evidence.metric_lines))
+    if metrics_without_evidence:
         raise ValueError(
-            f"Experience draft contains unsupported metrics: {', '.join(unsupported_metrics)}"
+            "Experience draft contains metrics not found in deterministic evidence: "
+            f"{', '.join(metrics_without_evidence)}"
         )

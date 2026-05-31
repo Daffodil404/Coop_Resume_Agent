@@ -29,7 +29,19 @@ class CLIExperienceDispatchTests(unittest.TestCase):
                 exit_code = main()
 
         self.assertEqual(exit_code, 2)
-        self.assertIn("Usage: resume-agent [experience ingest]", stderr.getvalue())
+        self.assertIn("Usage: resume-agent [experience ingest|review", stderr.getvalue())
+
+    def test_review_dispatches_draft_id(self) -> None:
+        with patch.object(
+            sys,
+            "argv",
+            ["resume-agent", "experience", "review", "experience_test"],
+        ):
+            with patch("resume_agent.cli.run_experience_review", return_value=0) as review:
+                exit_code = main()
+
+        self.assertEqual(exit_code, 0)
+        review.assert_called_once_with("experience_test")
 
 
 if __name__ == "__main__":

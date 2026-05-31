@@ -2,10 +2,12 @@ from __future__ import annotations
 
 import os
 import unittest
+from pathlib import Path
+from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
 from resume_agent.experience_bank.config import EXPERIENCE_MODE_ENV_VAR, OPENAI_API_KEY_ENV_VAR
-from resume_agent.experience_bank.evidence import ExtractedEvidence
+from resume_agent.experience_bank.evidence import EvidenceExtractor, ExtractedEvidence
 from resume_agent.experience_bank.ingestion import RuleBasedExperienceStructurer
 from resume_agent.experience_bank.openai_provider import OpenAIProviderError
 from resume_agent.experience_bank.pipeline import ExperienceIngestionPipeline
@@ -69,7 +71,7 @@ class PipelineTests(unittest.TestCase):
         self.assertEqual(draft["source"]["structurer"], "rule_based")
         self.assertIn("simulated API failure", warnings[0])
 
-    def test_guardrail_rejects_unsupported_ai_technology(self) -> None:
+    def test_guardrail_removes_ai_technology_not_found_in_raw_note(self) -> None:
         local_draft = RuleBasedExperienceStructurer().structure(
             RAW_NOTE,
             draft_id="experience_test",
@@ -77,6 +79,7 @@ class PipelineTests(unittest.TestCase):
         local_draft["source"]["structurer"] = "openai"
         local_draft["source"]["model"] = "fake-model"
         local_draft["technologies"].append("Kubernetes")
+        warnings = []
         with patch.dict(
             os.environ,
             {
@@ -85,10 +88,14 @@ class PipelineTests(unittest.TestCase):
             },
             clear=True,
         ):
-            with self.assertRaisesRegex(ValueError, "unsupported technologies"):
-                ExperienceIngestionPipeline(
-                    ai_structurer=_FakeAIStructurer(local_draft)
-                ).structure(RAW_NOTE, draft_id="experience_test")
+            draft = ExperienceIngestionPipeline(
+                ai_structurer=_FakeAIStructurer(local_draft),
+                warning_handler=warnings.append,
+            ).structure(RAW_NOTE, draft_id="experience_test")
+
+        self.assertNotIn("Kubernetes", draft["technologies"])
+        self.assertIn("not found in the raw note", draft["uncertain_points"][-1])
+        self.assertIn("Removed AI-extracted technologies", warnings[-1])
 
     def test_guardrail_rejects_unsupported_ai_metric(self) -> None:
         local_draft = RuleBasedExperienceStructurer().structure(
@@ -106,7 +113,7 @@ class PipelineTests(unittest.TestCase):
             },
             clear=True,
         ):
-            with self.assertRaisesRegex(ValueError, "unsupported metrics"):
+            with self.assertRaisesRegex(ValueError, "metrics not found in deterministic evidence"):
                 ExperienceIngestionPipeline(
                     ai_structurer=_FakeAIStructurer(local_draft)
                 ).structure(RAW_NOTE, draft_id="experience_test")
@@ -136,6 +143,72 @@ class PipelineTests(unittest.TestCase):
             ).structure(raw_note, draft_id="experience_test")
 
         self.assertEqual(draft["technologies"], ["Vue", "Vite"])
+
+    def test_new_raw_note_technology_can_be_added_to_local_dictionary(self) -> None:
+        raw_note = (
+            "Title: Landing Page\n"
+            "Company: Sample Lab\n"
+            "Used Figma to implement and refine the frontend landing page.\n"
+        )
+        local_draft = RuleBasedExperienceStructurer().structure(
+            raw_note,
+            draft_id="experience_test",
+        )
+        local_draft["source"]["structurer"] = "openai"
+        local_draft["source"]["model"] = "fake-model"
+        local_draft["technologies"].append("Figma")
+        with TemporaryDirectory() as temp_dir:
+            local_keywords_path = Path(temp_dir) / "technologies.local.json"
+            with patch.dict(
+                os.environ,
+                {
+                    EXPERIENCE_MODE_ENV_VAR: "ai",
+                    OPENAI_API_KEY_ENV_VAR: "fake-key",
+                },
+                clear=True,
+            ):
+                draft = ExperienceIngestionPipeline(
+                    ai_structurer=_FakeAIStructurer(local_draft),
+                    evidence_extractor=EvidenceExtractor(local_keywords_path=local_keywords_path),
+                    new_technology_handler=lambda technology: True,
+                ).structure(raw_note, draft_id="experience_test")
+
+            saved_keywords = local_keywords_path.read_text(encoding="utf-8")
+
+        self.assertEqual(draft["technologies"], ["Figma"])
+        self.assertIn("Figma", saved_keywords)
+        self.assertEqual(
+            draft["evidence"]["technology_lines"],
+            ["Used Figma to implement and refine the frontend landing page."],
+        )
+
+    def test_new_raw_note_technology_continues_when_dictionary_update_is_declined(self) -> None:
+        raw_note = (
+            "Title: Landing Page\n"
+            "Company: Sample Lab\n"
+            "Used Figma to implement and refine the frontend landing page.\n"
+        )
+        local_draft = RuleBasedExperienceStructurer().structure(
+            raw_note,
+            draft_id="experience_test",
+        )
+        local_draft["source"]["structurer"] = "openai"
+        local_draft["source"]["model"] = "fake-model"
+        local_draft["technologies"].append("Figma")
+        with patch.dict(
+            os.environ,
+            {
+                EXPERIENCE_MODE_ENV_VAR: "ai",
+                OPENAI_API_KEY_ENV_VAR: "fake-key",
+            },
+            clear=True,
+        ):
+            draft = ExperienceIngestionPipeline(
+                ai_structurer=_FakeAIStructurer(local_draft),
+                new_technology_handler=lambda technology: False,
+            ).structure(raw_note, draft_id="experience_test")
+
+        self.assertEqual(draft["technologies"], ["Figma"])
 
 
 class _FakeAIStructurer:

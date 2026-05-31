@@ -9,7 +9,10 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from unittest.mock import patch
 
-from resume_agent.experience_bank.cli import run_experience_ingest
+from resume_agent.experience_bank.cli import (
+    _confirm_local_technology_keyword,
+    run_experience_ingest,
+)
 from resume_agent.experience_bank.pipeline import ExperienceIngestionPipeline
 
 
@@ -45,6 +48,10 @@ class ExperienceIngestCLITests(unittest.TestCase):
         self.assertIn("Processing experience note...", terminal_output)
         self.assertIn("Structuring complete: rule_based (local)", terminal_output)
         self.assertIn("Draft was not merged", terminal_output)
+        self.assertIn("Next actions:", terminal_output)
+        self.assertIn("experience review", terminal_output)
+        self.assertIn("experience supplement", terminal_output)
+        self.assertIn("experience approve", terminal_output)
         self.assertIn("Using local Experience Bank fallback", stderr.getvalue())
 
     def test_ctrl_c_cancels_without_traceback_or_files(self) -> None:
@@ -92,6 +99,17 @@ class ExperienceIngestCLITests(unittest.TestCase):
         self.assertFalse(private_data_dir.exists())
         self.assertIn("Processing experience note...", stdout.getvalue())
         self.assertIn("Experience ingestion cancelled.", stderr.getvalue())
+
+    def test_can_confirm_new_local_technology_keyword_interactively(self) -> None:
+        with patch.object(sys, "stdin", _InteractiveStringIO("y\n")):
+            should_add = _confirm_local_technology_keyword("Figma")
+
+        self.assertTrue(should_add)
+
+
+class _InteractiveStringIO(StringIO):
+    def isatty(self) -> bool:
+        return True
 
 
 if __name__ == "__main__":

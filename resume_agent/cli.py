@@ -7,7 +7,12 @@ from .ai_client import AIClient
 from .config import get_resume_root
 from .cover_letter import decide_cover_letter
 from .cover_letter_draft import render_cover_letter_draft
-from .experience_bank.cli import run_experience_ingest
+from .experience_bank.cli import (
+    run_experience_approve,
+    run_experience_ingest,
+    run_experience_review,
+    run_experience_supplement,
+)
 from .jd import clean_jd_text
 from .mock_ai import MockAIClient
 from .mock_resume_strategy import MockResumeStrategyClient
@@ -127,8 +132,18 @@ def run_cover_letter_draft_generation(
 def main() -> int:
     if sys.argv[1:] == ["experience", "ingest"]:
         return run_experience_ingest()
+    if len(sys.argv) == 4 and sys.argv[1:3] == ["experience", "review"]:
+        return run_experience_review(sys.argv[3])
+    if len(sys.argv) == 4 and sys.argv[1:3] == ["experience", "approve"]:
+        return run_experience_approve(sys.argv[3])
+    if len(sys.argv) == 4 and sys.argv[1:3] == ["experience", "supplement"]:
+        return run_experience_supplement(sys.argv[3])
     if sys.argv[1:]:
-        print("Usage: resume-agent [experience ingest]", file=sys.stderr)
+        print(
+            "Usage: resume-agent [experience ingest|review <draft-id>|"
+            "supplement <draft-id>|approve <draft-id>]",
+            file=sys.stderr,
+        )
         return 2
 
     raw_jd = read_jd_from_stdin()

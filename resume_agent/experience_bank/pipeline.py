@@ -5,7 +5,12 @@ from typing import Callable
 
 from .ai_structurer import AIExperienceStructurer
 from .config import ALLOWED_EXPERIENCE_MODES, get_experience_mode, has_openai_api_key
-from .evidence import EvidenceExtractor, ExtractedEvidence
+from .evidence import (
+    EvidenceExtractor,
+    ExtractedEvidence,
+    include_explicit_technologies,
+    technology_is_explicitly_mentioned,
+)
 from .ingestion import RuleBasedExperienceStructurer
 from .preprocessor import RawNotePreprocessor
 from .openai_provider import OpenAIProviderError
@@ -24,6 +29,7 @@ class ExperienceIngestionPipeline:
     ai_structurer: ExperienceStructurer | None = None
     warning_handler: Callable[[str], None] | None = None
     progress_handler: Callable[[str], None] | None = None
+    new_technology_handler: Callable[[str], bool] | None = None
 
     def validate_configuration(self) -> None:
         selected_mode = self.mode or get_experience_mode()
@@ -54,6 +60,7 @@ class ExperienceIngestionPipeline:
         else:
             raise ValueError(f"Unknown Experience Bank ingestion mode: {selected_mode}")
 
+        evidence = self._review_new_technologies(draft, clean_note, evidence, evidence_extractor)
         validate_experience_draft(draft)
         validate_experience_draft_against_evidence(draft, evidence)
         return draft
@@ -85,6 +92,52 @@ class ExperienceIngestionPipeline:
     ) -> dict[str, object]:
         ai_structurer = self.ai_structurer or AIExperienceStructurer()
         return ai_structurer.structure(clean_note, draft_id, evidence)
+
+    def _review_new_technologies(
+        self,
+        draft: dict[str, object],
+        clean_note: str,
+        evidence: ExtractedEvidence,
+        evidence_extractor: EvidenceExtractor,
+    ) -> ExtractedEvidence:
+        new_technologies = sorted(set(draft["technologies"]) - set(evidence.technologies))
+        if not new_technologies:
+            return evidence
+        missing_from_note = [
+            technology
+            for technology in new_technologies
+            if not technology_is_explicitly_mentioned(technology, clean_note)
+        ]
+        if missing_from_note:
+            draft["technologies"] = [
+                technology
+                for technology in draft["technologies"]
+                if technology not in missing_from_note
+            ]
+            draft["uncertain_points"].append(
+                "Removed AI-extracted technologies that were not found in the raw note: "
+                f"{', '.join(missing_from_note)}"
+            )
+            self._warn(
+                "Removed AI-extracted technologies not found in the raw note: "
+                f"{', '.join(missing_from_note)}"
+            )
+            new_technologies = [
+                technology for technology in new_technologies if technology not in missing_from_note
+            ]
+        for technology in new_technologies:
+            self._warn(
+                f"AI extracted a technology not yet included in the local keyword dictionary: "
+                f"{technology}"
+            )
+            if self.new_technology_handler and self.new_technology_handler(technology):
+                evidence_extractor.add_local_keyword(technology)
+                self._progress(f"Added local technology keyword: {technology}")
+            else:
+                self._progress(f"Continuing without adding local technology keyword: {technology}")
+        evidence = include_explicit_technologies(evidence, clean_note, new_technologies)
+        draft["evidence"]["technology_lines"] = evidence.technology_lines
+        return evidence
 
     def _warn(self, message: str) -> None:
         if self.warning_handler:
