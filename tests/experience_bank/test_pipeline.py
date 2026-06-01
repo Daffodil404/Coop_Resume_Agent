@@ -254,6 +254,122 @@ class PipelineTests(unittest.TestCase):
         self.assertIn("使用了 Figma 的 MCP 来快速完成样式实现。", draft["evidence"]["technology_lines"])
         self.assertNotIn("Removed AI-extracted technologies", " ".join(warnings))
 
+    def test_grounded_taxonomy_and_qualitative_impact_for_wechat_pay_flow(self) -> None:
+        raw_note = (
+            "Company: Cosnex\n"
+            "This startup project needed to support domestic payments through WeChat Pay.\n"
+            "I obtained WeChat merchant certification and configured certificates on the server.\n"
+            "The backend prepared the payment amount and generated a payment link.\n"
+            "The frontend rendered the link as a QR code.\n"
+            "Users scanned the QR code with WeChat to invoke payment.\n"
+            "The backend polled payment status and the frontend redirected after successful polling.\n"
+            "The backend recorded transaction data into the database.\n"
+            "Frontend stack: Next.js and TypeScript.\n"
+            "Backend stack: Python.\n"
+            "We also mentioned Dokploy for deployment.\n"
+        )
+        ai_draft = {
+            "id": "experience_test",
+            "status": "draft",
+            "source": {
+                "type": "raw_experience_note",
+                "created_at": "2026-05-31T00:00:00Z",
+                "structurer": "openai",
+                "model": "fake-model",
+            },
+            "title": "WeChat Pay Integration",
+            "company": "Cosnex",
+            "time_period": None,
+            "context": "Implemented a payment integration for a startup product.",
+            "problem": "The product needed domestic payment support through WeChat Pay.",
+            "role": "Full-stack engineer",
+            "actions": [
+                "Configured payment certificates and implemented the end-to-end QR-code payment workflow."
+            ],
+            "technologies": ["Python"],
+            "impact": [],
+            "metrics": [],
+            "role_types": [],
+            "skills": [],
+            "domain_keywords": [],
+            "possible_resume_angles": [],
+            "evidence": {"action_lines": [], "metric_lines": [], "technology_lines": []},
+            "evidence_lines": [],
+            "draft_bullets": [],
+            "truth_constraints": [],
+            "uncertain_points": [],
+            "confidence": {
+                "metrics": "low",
+                "tools": "low",
+                "ownership": "medium",
+                "impact": "low",
+            },
+            "usable_for": [],
+        }
+        with patch.dict(
+            os.environ,
+            {
+                EXPERIENCE_MODE_ENV_VAR: "ai",
+                OPENAI_API_KEY_ENV_VAR: "fake-key",
+            },
+            clear=True,
+        ):
+            draft = ExperienceIngestionPipeline(
+                ai_structurer=_FakeAIStructurer(ai_draft)
+            ).structure(raw_note, draft_id="experience_test")
+
+        self.assertIn("Python", draft["technologies"])
+        self.assertIn("Next.js", draft["technologies"])
+        self.assertIn("TypeScript", draft["technologies"])
+        self.assertIn("Dokploy", draft["technologies"])
+        self.assertIn("WeChat Pay", draft["technologies"])
+        self.assertNotIn("React", draft["technologies"])
+        self.assertNotIn("Tailwind", draft["technologies"])
+        self.assertIn("fullstack", draft["role_types"])
+        self.assertIn("software_engineering", draft["role_types"])
+        self.assertIn("frontend", draft["role_types"])
+        self.assertIn("backend", draft["role_types"])
+        self.assertIn("payment integration", draft["skills"])
+        self.assertIn("third-party API integration", draft["skills"])
+        self.assertIn("QR-code payment flow implementation", draft["skills"])
+        self.assertIn("frontend-backend integration", draft["skills"])
+        self.assertIn("backend polling", draft["skills"])
+        self.assertIn("transaction data persistence", draft["skills"])
+        self.assertIn("certificate configuration", draft["skills"])
+        self.assertIn("full-stack feature implementation", draft["skills"])
+        self.assertIn("payment integration", draft["domain_keywords"])
+        self.assertIn("WeChat Pay", draft["domain_keywords"])
+        self.assertIn("domestic payments", draft["domain_keywords"])
+        self.assertIn("QR-code payment", draft["domain_keywords"])
+        self.assertIn("transaction processing", draft["domain_keywords"])
+        self.assertIn("Full-stack payment integration with WeChat Pay", draft["possible_resume_angles"])
+        self.assertIn("QR-code payment flow implementation", draft["possible_resume_angles"])
+        self.assertIn("Frontend-backend payment workflow integration", draft["possible_resume_angles"])
+        self.assertIn("Backend polling and transaction persistence", draft["possible_resume_angles"])
+        self.assertIn("Certificate-based payment service setup", draft["possible_resume_angles"])
+        self.assertIn(
+            "Enabled domestic users to complete payments through a WeChat Pay QR-code flow.",
+            draft["impact"],
+        )
+        self.assertIn(
+            "Supported payment status tracking and transaction data recording after successful polling.",
+            draft["impact"],
+        )
+        self.assertEqual(draft["metrics"], [])
+        self.assertEqual(
+            draft["evidence"]["technology_lines"],
+            [
+                "This startup project needed to support domestic payments through WeChat Pay.",
+                "Frontend stack: Next.js and TypeScript.",
+                "Backend stack: Python.",
+                "We also mentioned Dokploy for deployment.",
+            ],
+        )
+        self.assertIn("fullstack", draft["usable_for"])
+        self.assertIn("software_engineering", draft["usable_for"])
+        self.assertIn("backend", draft["usable_for"])
+        self.assertIn("frontend", draft["usable_for"])
+
 
 class _FakeAIStructurer:
     name = "openai"

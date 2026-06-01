@@ -70,9 +70,38 @@ class ReviewWorkflowTests(unittest.TestCase):
                     pipeline=pipeline,
                 )
             drafts = list((data_root / "data/private/experience_drafts").glob("*.yaml"))
+            proposals = list((data_root / "data/private/experience_supplements").glob("*.yaml"))
+
+        self.assertEqual(exit_code, 0)
+        self.assertEqual(len(drafts), 1)
+        self.assertEqual(len(proposals), 1)
+
+    def test_supplement_can_save_updated_draft_version_without_overwriting_original(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir)
+            _save_draft(data_root)
+            pipeline = ExperienceIngestionPipeline(mode="local")
+            supplement = "Time period: January 2025 - April 2025\nImpact: Supported internal API adoption."
+            with (
+                patch.object(sys, "stdin", _InteractiveStringIO(supplement)),
+                patch("builtins.input", return_value="y"),
+            ):
+                exit_code = run_experience_supplement(
+                    "experience_test",
+                    data_root=data_root,
+                    pipeline=pipeline,
+                )
+            drafts = list((data_root / "data/private/experience_drafts").glob("*.yaml"))
+            proposals = list((data_root / "data/private/experience_supplements").glob("*.yaml"))
+            updated_draft_path = next(path for path in drafts if path.stem != "experience_test")
+            updated_raw_note = (
+                data_root / "data/private/raw_experience_notes" / f"{updated_draft_path.stem}.txt"
+            ).read_text(encoding="utf-8")
 
         self.assertEqual(exit_code, 0)
         self.assertEqual(len(drafts), 2)
+        self.assertEqual(len(proposals), 1)
+        self.assertEqual(updated_raw_note, supplement)
 
     def test_interactive_next_action_dispatches_review(self) -> None:
         with TemporaryDirectory() as temp_dir:

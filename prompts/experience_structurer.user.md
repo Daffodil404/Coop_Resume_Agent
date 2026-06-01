@@ -29,7 +29,9 @@ Field guidance:
 - For example, if the raw note says `Figma 的 MCP`, extract `Figma` and `MCP` separately, not `Figma MCP`.
 - Do not add common but unmentioned frontend technologies such as React, TypeScript, Next.js, Tailwind, or CSS only because the note mentions frontend or landing page work.
 - `impact`: include only supported outcomes.
+- `impact`: include supported qualitative outcomes when the raw note clearly describes what the implementation enabled or supported. Do not invent quantitative metrics.
 - `metrics`: include only explicitly stated metrics.
+- `role_types`, `skills`, `domain_keywords`, `possible_resume_angles`, and `usable_for`: do not leave these empty when the raw note clearly supports conservative English labels.
 - `uncertain_points`: list missing details that would improve future review.
 - `draft_bullets`: keep empty.
 

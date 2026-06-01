@@ -11,6 +11,7 @@ from unittest.mock import patch
 
 from resume_agent.experience_bank.cli import (
     _confirm_local_technology_keyword,
+    offer_immediate_supplement,
     run_experience_ingest,
 )
 from resume_agent.experience_bank.pipeline import ExperienceIngestionPipeline
@@ -105,6 +106,30 @@ class ExperienceIngestCLITests(unittest.TestCase):
             should_add = _confirm_local_technology_keyword("Figma")
 
         self.assertTrue(should_add)
+
+    def test_ingest_offers_immediate_supplement_when_interactive(self) -> None:
+        raw_note = (
+            "Title: Sample API Project\n"
+            "Company: Sample Lab\n"
+            "Built a Python REST API and tested the workflow with a student team.\n"
+        )
+        with TemporaryDirectory() as temp_dir:
+            data_root = Path(temp_dir)
+            output = StringIO()
+            stderr = StringIO()
+            with patch.dict(os.environ, {}, clear=True):
+                with patch.object(sys, "stdin", _InteractiveStringIO(raw_note)):
+                    with patch(
+                        "resume_agent.experience_bank.cli.offer_immediate_supplement",
+                        return_value=0,
+                    ) as follow_up:
+                        with redirect_stdout(output):
+                            with redirect_stderr(stderr):
+                                exit_code = run_experience_ingest(data_root=data_root)
+
+        self.assertEqual(exit_code, 0)
+        follow_up.assert_called_once()
+        self.assertIn("Saved structured YAML draft", output.getvalue())
 
 
 class _InteractiveStringIO(StringIO):

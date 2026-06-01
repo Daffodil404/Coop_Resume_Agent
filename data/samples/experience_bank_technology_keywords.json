@@ -4,6 +4,7 @@
     "Java",
     "JavaScript",
     "TypeScript",
+    "Next.js",
     "Figma",
     "MCP",
     "React",
@@ -29,5 +30,8 @@
     "GraphQL",
     "Terraform",
     "Jenkins"
+    ,
+    "Dokploy",
+    "WeChat Pay"
   ]
 }

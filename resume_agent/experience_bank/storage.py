@@ -11,6 +11,7 @@ from .validator import validate_experience_draft
 
 RAW_NOTES_DIR = Path("data/private/raw_experience_notes")
 EXPERIENCE_DRAFTS_DIR = Path("data/private/experience_drafts")
+EXPERIENCE_SUPPLEMENTS_DIR = Path("data/private/experience_supplements")
 EXPERIENCE_BANK_PATH = Path("data/private/experience_bank.yaml")
 
 
@@ -60,6 +61,21 @@ def save_experience_draft(
     }
 
 
+def save_experience_supplement_proposal(
+    proposal: dict[str, Any],
+    data_root: Path = Path("."),
+) -> dict[str, str]:
+    supplements_dir = data_root / EXPERIENCE_SUPPLEMENTS_DIR
+    supplements_dir.mkdir(parents=True, exist_ok=True)
+    proposal_id = str(proposal["proposal_id"])
+    proposal_path = _available_path(supplements_dir / f"{proposal_id}.yaml")
+    proposal_path.write_text(
+        yaml.safe_dump(proposal, sort_keys=False, allow_unicode=True),
+        encoding="utf-8",
+    )
+    return {"proposal_path": str(proposal_path)}
+
+
 def load_experience_draft(draft_id: str, data_root: Path = Path(".")) -> dict[str, Any]:
     draft_path = data_root / EXPERIENCE_DRAFTS_DIR / f"{draft_id}.yaml"
     if not draft_path.is_file():
@@ -75,6 +91,24 @@ def load_raw_experience_note(draft_id: str, data_root: Path = Path(".")) -> str:
     if not raw_path.is_file():
         raise ValueError(f"Raw experience note not found: {draft_id}")
     return raw_path.read_text(encoding="utf-8")
+
+
+def save_updated_experience_draft_version(
+    original_draft_id: str,
+    raw_supplement_note: str,
+    structured_draft: dict[str, Any],
+    data_root: Path = Path("."),
+) -> dict[str, str]:
+    updated_draft = deepcopy(structured_draft)
+    updated_draft["id"] = create_available_draft_id(data_root=data_root)
+    updated_draft["status"] = "draft"
+    updated_draft["source"]["derived_from_draft_id"] = original_draft_id
+    updated_draft["source"]["update_basis"] = "supplement_proposal"
+    return save_experience_draft(
+        raw_note=raw_supplement_note,
+        structured_draft=updated_draft,
+        data_root=data_root,
+    )
 
 
 def approve_experience_draft(

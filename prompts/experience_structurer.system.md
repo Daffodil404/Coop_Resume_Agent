@@ -23,6 +23,8 @@ Rules:
 - For example, `Figma 的 MCP` supports `Figma` and `MCP` separately. Do not combine them into `Figma MCP`.
 - Do not add common frontend technologies just because the note mentions frontend or landing page work.
 - Never add a metric unless it appears explicitly in the raw note or deterministic evidence.
+- When the raw note clearly supports reusable skill categories, role taxonomy, domain keywords, or qualitative outcomes, fill those fields conservatively instead of leaving them empty.
+- Qualitative impact is allowed when the note clearly supports an outcome or workflow capability. Quantitative impact still requires explicit numbers.
 - Put unclear details in `uncertain_points`.
 - Keep `draft_bullets` empty. Resume bullet rewriting is a separate reviewed step.
 - Populate confidence conservatively. Use `low` when a field is missing or ambiguous.

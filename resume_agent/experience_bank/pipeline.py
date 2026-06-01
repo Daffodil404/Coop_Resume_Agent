@@ -12,6 +12,7 @@ from .evidence import (
     split_supported_compound_technology,
     technology_is_explicitly_mentioned,
 )
+from .grounding import apply_grounded_enrichment
 from .ingestion import RuleBasedExperienceStructurer
 from .preprocessor import RawNotePreprocessor
 from .openai_provider import OpenAIProviderError
@@ -61,6 +62,7 @@ class ExperienceIngestionPipeline:
         else:
             raise ValueError(f"Unknown Experience Bank ingestion mode: {selected_mode}")
 
+        apply_grounded_enrichment(draft, clean_note, evidence)
         evidence = self._review_new_technologies(draft, clean_note, evidence, evidence_extractor)
         validate_experience_draft(draft)
         validate_experience_draft_against_evidence(draft, evidence)

@@ -11,8 +11,14 @@ from .storage import (
     approve_experience_draft,
     create_available_draft_id,
     load_experience_draft,
-    load_raw_experience_note,
     save_experience_draft,
+    save_experience_supplement_proposal,
+    save_updated_experience_draft_version,
+)
+from .supplement import (
+    analyze_experience_gaps,
+    create_supplement_proposal,
+    propose_supplement_merge,
 )
 from .validator import validate_raw_experience_note
 
@@ -71,6 +77,15 @@ def run_experience_ingest(
         f" ({structured_draft['source']['model'] or 'local'})"
     )
     print("Draft was not merged into an experience bank.")
+    if sys.stdin.isatty():
+        follow_up_exit_code = offer_immediate_supplement(
+            draft_id=draft_id,
+            original_draft=structured_draft,
+            data_root=data_root,
+            pipeline=selected_pipeline,
+        )
+        if follow_up_exit_code != 0:
+            return follow_up_exit_code
     print_next_actions(draft_id)
     return offer_next_action_if_interactive(draft_id, data_root=data_root)
 
@@ -143,12 +158,27 @@ def run_experience_supplement(
     pipeline: ExperienceIngestionPipeline | None = None,
 ) -> int:
     try:
-        original_note = load_raw_experience_note(draft_id, data_root=data_root)
+        original_draft = load_experience_draft(draft_id, data_root=data_root)
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 1
-    print(f"Add supplemental details for draft: {draft_id}")
-    print("Paste additional facts only. Press Ctrl-D on a new line when finished.")
+    return run_supplement_workflow(
+        draft_id=draft_id,
+        original_draft=original_draft,
+        data_root=data_root,
+        pipeline=pipeline,
+    )
+
+
+def run_supplement_workflow(
+    draft_id: str,
+    original_draft: dict[str, object],
+    data_root: Path = Path("."),
+    pipeline: ExperienceIngestionPipeline | None = None,
+) -> int:
+    gap_analysis = analyze_experience_gaps(original_draft)
+    print_gap_analysis(draft_id, gap_analysis)
+    print("Paste supplemental details only. Press Ctrl-D on a new line when finished.")
     print()
     try:
         supplement = sys.stdin.read()
@@ -161,12 +191,11 @@ def run_experience_supplement(
         print(str(error), file=sys.stderr)
         return 1
 
-    combined_note = f"{original_note.rstrip()}\n\nSupplemental details:\n{supplement.strip()}\n"
     selected_pipeline = pipeline or _build_pipeline(data_root)
-    new_draft_id = create_available_draft_id(data_root=data_root)
+    supplement_draft_id = create_available_draft_id(data_root=data_root)
     print("Processing supplemented experience note...", flush=True)
     try:
-        structured_draft = selected_pipeline.structure(combined_note, draft_id=new_draft_id)
+        structured_draft = selected_pipeline.structure(supplement, draft_id=supplement_draft_id)
     except KeyboardInterrupt:
         print("\nExperience supplement cancelled.", file=sys.stderr)
         return 130
@@ -174,10 +203,28 @@ def run_experience_supplement(
         print(str(error), file=sys.stderr)
         return 2
     structured_draft["source"]["supplements_draft_id"] = draft_id
-    save_experience_draft(combined_note, structured_draft, data_root=data_root)
-    print(f"Saved supplemented draft: {new_draft_id}")
-    print_next_actions(new_draft_id)
-    return offer_next_action_if_interactive(new_draft_id, data_root=data_root)
+    proposed_changes = propose_supplement_merge(original_draft, structured_draft)
+    proposal = create_supplement_proposal(
+        original_draft=original_draft,
+        gap_analysis=gap_analysis,
+        raw_supplement_note=supplement,
+        structured_supplement=structured_draft,
+        proposed_changes=proposed_changes,
+    )
+    saved_paths = save_experience_supplement_proposal(proposal, data_root=data_root)
+    print(f"Saved supplement proposal: {saved_paths['proposal_path']}")
+    print("Original draft was not overwritten.")
+    print_proposed_changes_summary(proposed_changes)
+    if _confirm_create_updated_draft():
+        updated_paths = save_updated_experience_draft_version(
+            original_draft_id=draft_id,
+            raw_supplement_note=supplement,
+            structured_draft=proposed_changes["proposed_draft"],
+            data_root=data_root,
+        )
+        print(f"Saved updated draft version: {updated_paths['draft_path']}")
+    print_next_actions(draft_id)
+    return offer_next_action_if_interactive(draft_id, data_root=data_root)
 
 
 def print_next_actions(draft_id: str) -> None:
@@ -211,6 +258,71 @@ def offer_next_action_if_interactive(draft_id: str, data_root: Path = Path("."))
     if response not in {"", "q", "quit", "exit"}:
         print("Unknown action. Use the printed commands to continue later.", file=sys.stderr)
     return 0
+
+
+def print_gap_analysis(draft_id: str, gap_analysis: dict[str, object]) -> None:
+    print(f"Supplement analysis for draft: {draft_id}")
+    print(f"Overall status: {gap_analysis['overall_status']}")
+    print(f"Reason: {gap_analysis['reason']}")
+    if gap_analysis["missing_fields"]:
+        print(f"Missing fields: {', '.join(gap_analysis['missing_fields'])}")
+    if gap_analysis["weak_fields"]:
+        print(f"Weak fields: {', '.join(gap_analysis['weak_fields'])}")
+    if gap_analysis["unsupported_fields"]:
+        print(f"Unsupported fields: {', '.join(gap_analysis['unsupported_fields'])}")
+    if gap_analysis["priority_questions"]:
+        print("Priority questions:")
+        for question in gap_analysis["priority_questions"]:
+            print(f"- {question}")
+
+
+def print_proposed_changes_summary(proposed_changes: dict[str, object]) -> None:
+    field_changes = proposed_changes["field_changes"]
+    if field_changes:
+        print("Supplement proposal includes changes for:")
+        for field_name in field_changes:
+            print(f"- {field_name}")
+    if proposed_changes["warnings"]:
+        for warning in proposed_changes["warnings"]:
+            print(f"Warning: {warning}")
+
+
+def offer_immediate_supplement(
+    draft_id: str,
+    original_draft: dict[str, object],
+    data_root: Path,
+    pipeline: ExperienceIngestionPipeline,
+) -> int:
+    gap_analysis = analyze_experience_gaps(original_draft)
+    print()
+    print("Immediate follow-up questions")
+    print_gap_analysis(draft_id, gap_analysis)
+    try:
+        response = input("Add supplemental details now? [Y/n] ").strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\nSkipping supplemental follow-up.", file=sys.stderr)
+        return 0
+    if response not in {"", "y", "yes"}:
+        return 0
+    return run_supplement_workflow(
+        draft_id=draft_id,
+        original_draft=original_draft,
+        data_root=data_root,
+        pipeline=pipeline,
+    )
+
+
+def _confirm_create_updated_draft() -> bool:
+    if not sys.stdin.isatty():
+        return False
+    try:
+        response = input(
+            "Create a new updated draft version from this supplement proposal? [y/N] "
+        ).strip().lower()
+    except (EOFError, KeyboardInterrupt):
+        print("\nSkipping updated draft creation.", file=sys.stderr)
+        return False
+    return response in {"y", "yes"}
 
 
 def _build_pipeline(data_root: Path) -> ExperienceIngestionPipeline:
