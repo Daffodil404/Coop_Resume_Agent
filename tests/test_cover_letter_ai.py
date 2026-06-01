@@ -6,6 +6,7 @@ from tempfile import TemporaryDirectory
 
 import yaml
 
+from resume_agent.ai.model_router import ModelConfig
 from resume_agent.cover_letter_ai import (
     COVER_LETTER_RESPONSE_SCHEMA,
     CoverLetterGenerator,
@@ -110,7 +111,11 @@ class CoverLetterAITests(unittest.TestCase):
                 ),
                 encoding="utf-8",
             )
-            generated = CoverLetterGenerator(response_provider=fake_provider, model="gpt-test").generate(
+            generated = CoverLetterGenerator(
+                response_provider=fake_provider,
+                model_config=ModelConfig(task_key="cover_letter_writer", model="gpt-test"),
+                data_root=data_root,
+            ).generate(
                 jd_analysis={"company": "Example", "role_title": "Software Engineer"},
                 resume_strategy={"recommended_resume_base": "sde"},
                 resume_selection={"selected_resume_pdf": "/tmp/example.pdf"},

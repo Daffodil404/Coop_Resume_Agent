@@ -57,6 +57,37 @@ class OpenAIResponsesProviderTests(unittest.TestCase):
                 with self.assertRaisesRegex(OpenAIProviderError, "did not contain"):
                     OpenAIResponsesProvider()("system prompt", "user prompt")
 
+    def test_includes_optional_temperature_tokens_and_reasoning(self) -> None:
+        response_body = {
+            "output": [
+                {
+                    "content": [
+                        {
+                            "type": "output_text",
+                            "text": json.dumps({"ok": True}),
+                        }
+                    ]
+                }
+            ]
+        }
+        with patch.dict(os.environ, {OPENAI_API_KEY_ENV_VAR: "fake-key"}, clear=True):
+            with patch(
+                "resume_agent.experience_bank.openai_provider.urlopen",
+                return_value=_FakeHTTPResponse(response_body),
+            ) as request:
+                OpenAIResponsesProvider(
+                    model="gpt-5.4",
+                    temperature=0.2,
+                    max_output_tokens=900,
+                    reasoning_effort="low",
+                )("system prompt", "user prompt")
+
+        sent_request = request.call_args.args[0]
+        payload = json.loads(sent_request.data.decode("utf-8"))
+        self.assertEqual(payload["temperature"], 0.2)
+        self.assertEqual(payload["max_output_tokens"], 900)
+        self.assertEqual(payload["reasoning"]["effort"], "low")
+
 
 class _FakeHTTPResponse:
     def __init__(self, payload: dict[str, object]) -> None:

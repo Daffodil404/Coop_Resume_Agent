@@ -16,6 +16,7 @@ from .experience_bank.cli import (
 from .jd import clean_jd_text
 from .mock_ai import MockAIClient
 from .mock_resume_strategy import MockResumeStrategyClient
+from .openai_jd_analysis import OpenAIJdAnalysisClient, should_use_ai_jd_analysis
 from .resume_inventory import scan_resume_inventory, select_resume_pdf
 from .storage import (
     create_application_dir,
@@ -27,6 +28,7 @@ from .storage import (
     save_resume_strategy,
     save_resume_selection,
 )
+from .experience_bank.openai_provider import OpenAIProviderError
 
 
 def read_jd_from_stdin() -> str | None:
@@ -157,8 +159,7 @@ def main() -> int:
         return 1
 
     clean_jd = clean_jd_text(raw_jd)
-    ai_client: AIClient = MockAIClient()
-    analysis = ai_client.analyze_jd(clean_jd)
+    analysis = analyze_job_description(clean_jd, data_root=Path.cwd())
     print_analysis_summary(analysis)
 
     if not confirm_analysis():
@@ -209,3 +210,15 @@ def main() -> int:
         "cover_letter_generation.json"
     )
     return 0
+
+
+def analyze_job_description(clean_jd: str, data_root: Path) -> dict[str, object]:
+    if should_use_ai_jd_analysis():
+        try:
+            ai_client = OpenAIJdAnalysisClient(data_root=data_root)
+            print(f"Using model {ai_client.model} for jd_analysis")
+            return ai_client.analyze_jd(clean_jd)
+        except OpenAIProviderError as error:
+            print(f"{error} Using local JD analysis fallback.", file=sys.stderr)
+    ai_client: AIClient = MockAIClient()
+    return ai_client.analyze_jd(clean_jd)

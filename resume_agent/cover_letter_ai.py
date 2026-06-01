@@ -6,7 +6,8 @@ from typing import Any, Callable
 
 import yaml
 
-from .experience_bank.config import get_openai_model, has_openai_api_key
+from .ai.model_router import ModelConfig, get_model_config
+from .experience_bank.config import has_openai_api_key
 from .experience_bank.openai_provider import OpenAIProviderError, OpenAIResponsesProvider
 
 
@@ -22,15 +23,22 @@ class CoverLetterGenerator:
     def __init__(
         self,
         response_provider: Callable[[str, str], dict[str, object]] | None = None,
-        model: str | None = None,
+        model_config: ModelConfig | None = None,
+        data_root: Path = Path("."),
     ) -> None:
+        resolved_model_config = model_config or get_model_config("cover_letter_writer", data_root=data_root)
         provider = response_provider or OpenAIResponsesProvider(
-            model=model,
+            model=resolved_model_config.model,
             schema_name="cover_letter_draft",
             schema=COVER_LETTER_RESPONSE_SCHEMA,
+            temperature=resolved_model_config.temperature,
+            max_output_tokens=resolved_model_config.max_output_tokens,
+            reasoning_effort=resolved_model_config.reasoning_effort,
         )
         self.response_provider = provider
-        self.model = model or getattr(provider, "model", None)
+        self.model_config = resolved_model_config
+        self.model = getattr(provider, "model", None) or resolved_model_config.model
+        self.data_root = data_root
 
     def generate(
         self,
@@ -62,6 +70,10 @@ class CoverLetterGenerator:
         generated["generation_source"] = {
             "type": self.name,
             "model": self.model,
+            "task_key": self.model_config.task_key,
+            "temperature": self.model_config.temperature,
+            "max_output_tokens": self.model_config.max_output_tokens,
+            "reasoning_effort": self.model_config.reasoning_effort,
         }
         return generated
 

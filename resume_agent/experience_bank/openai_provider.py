@@ -24,11 +24,17 @@ class OpenAIResponsesProvider:
         timeout_seconds: int = 60,
         schema_name: str = "experience_bank_draft",
         schema: dict[str, object] | None = None,
+        temperature: float | None = None,
+        max_output_tokens: int | None = None,
+        reasoning_effort: str | None = None,
     ) -> None:
         self.model = model or get_openai_model()
         self.timeout_seconds = timeout_seconds
         self.schema_name = schema_name
         self.schema = schema or EXPERIENCE_DRAFT_RESPONSE_SCHEMA
+        self.temperature = temperature
+        self.max_output_tokens = max_output_tokens
+        self.reasoning_effort = reasoning_effort
 
     def __call__(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
         payload = {
@@ -44,6 +50,12 @@ class OpenAIResponsesProvider:
                 }
             },
         }
+        if self.temperature is not None:
+            payload["temperature"] = self.temperature
+        if self.max_output_tokens is not None:
+            payload["max_output_tokens"] = self.max_output_tokens
+        if self.reasoning_effort is not None:
+            payload["reasoning"] = {"effort": self.reasoning_effort}
         request = Request(
             OPENAI_RESPONSES_URL,
             data=json.dumps(payload).encode("utf-8"),

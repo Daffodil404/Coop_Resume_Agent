@@ -95,6 +95,7 @@ def render_cover_letter_draft(
         "generation_mode": generation_mode,
         "reason": generation_reason,
         "evidence_entry_ids": draft_content.get("evidence_entry_ids", []),
+        "generation_source": draft_content.get("generation_source"),
         "role_title": role_title,
         "company": company,
     }
@@ -125,7 +126,7 @@ def _build_cover_letter_content(
 ) -> tuple[dict[str, Any], str, str]:
     if should_use_ai_cover_letter_generation():
         try:
-            generated = CoverLetterGenerator().generate(
+            generated = CoverLetterGenerator(data_root=data_root).generate(
                 jd_analysis=jd_analysis,
                 resume_strategy=resume_strategy,
                 resume_selection=resume_selection,
