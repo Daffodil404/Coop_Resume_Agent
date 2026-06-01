@@ -111,18 +111,21 @@ def run_cover_letter_draft_generation(
     application_dir: Path,
     jd_analysis: dict[str, object],
     resume_strategy: dict[str, object],
+    resume_selection: dict[str, object],
     cover_letter_decision: dict[str, object],
 ) -> dict[str, object]:
     generation = render_cover_letter_draft(
         jd_analysis=jd_analysis,
         resume_strategy=resume_strategy,
+        resume_selection=resume_selection,
         cover_letter_decision=cover_letter_decision,
         output_path=application_dir / "cover_letter.tex",
+        data_root=Path.cwd(),
     )
     save_cover_letter_generation(application_dir, generation)
     if generation["generated"]:
         print(f"Generated editable cover letter draft: {generation['output_path']}")
-        print("Cover letter generation mode: template_based_mock")
+        print(f"Cover letter generation mode: {generation['generation_mode']}")
     else:
         print("Cover letter generation skipped.")
     print()
@@ -195,6 +198,7 @@ def main() -> int:
         application_dir,
         analysis,
         resume_strategy,
+        resume_selection,
         cover_letter_decision,
     )
 

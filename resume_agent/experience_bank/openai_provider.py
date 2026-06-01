@@ -18,9 +18,17 @@ class OpenAIProviderError(RuntimeError):
 class OpenAIResponsesProvider:
     """Call OpenAI Responses API with strict structured output."""
 
-    def __init__(self, model: str | None = None, timeout_seconds: int = 60) -> None:
+    def __init__(
+        self,
+        model: str | None = None,
+        timeout_seconds: int = 60,
+        schema_name: str = "experience_bank_draft",
+        schema: dict[str, object] | None = None,
+    ) -> None:
         self.model = model or get_openai_model()
         self.timeout_seconds = timeout_seconds
+        self.schema_name = schema_name
+        self.schema = schema or EXPERIENCE_DRAFT_RESPONSE_SCHEMA
 
     def __call__(self, system_prompt: str, user_prompt: str) -> dict[str, object]:
         payload = {
@@ -30,9 +38,9 @@ class OpenAIResponsesProvider:
             "text": {
                 "format": {
                     "type": "json_schema",
-                    "name": "experience_bank_draft",
+                    "name": self.schema_name,
                     "strict": True,
-                    "schema": EXPERIENCE_DRAFT_RESPONSE_SCHEMA,
+                    "schema": self.schema,
                 }
             },
         }
