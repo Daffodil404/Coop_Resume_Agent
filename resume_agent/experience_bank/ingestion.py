@@ -1,38 +1,13 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import datetime, timezone
 
-from .schema import ExperienceDraft
+from .evidence import EvidenceExtractor, ExtractedEvidence
+from .preprocessor import RawNotePreprocessor
+from .schema import DraftConfidence, DraftEvidence, DraftSource, ExperienceDraft
 from .validator import validate_raw_experience_note
 
-
-TECHNOLOGY_KEYWORDS = [
-    "Python",
-    "Java",
-    "JavaScript",
-    "TypeScript",
-    "React",
-    "Node",
-    "SQL",
-    "PostgreSQL",
-    "MySQL",
-    "AWS",
-    "Azure",
-    "GCP",
-    "Docker",
-    "Kubernetes",
-    "Git",
-    "Linux",
-    "C++",
-    "C#",
-    "HTML",
-    "CSS",
-    "REST",
-    "GraphQL",
-    "Terraform",
-    "Jenkins",
-]
 
 ROLE_TYPE_RULES = {
     "ai_engineer": ("machine learning", "artificial intelligence", "llm", "nlp"),
@@ -61,57 +36,91 @@ DOMAIN_RULES = {
 }
 
 
-def structure_experience_note(raw_note: str, draft_id: str) -> dict[str, object]:
-    """Build a conservative structured draft from explicit note content."""
-    validate_raw_experience_note(raw_note)
-    lines = [line.strip() for line in raw_note.splitlines() if line.strip()]
-    searchable_text = " ".join(lines)
-    title = _extract_labeled_value(lines, ("title", "project", "experience"))
-    company = _extract_labeled_value(lines, ("company", "employer", "organization"))
-    time_period = _extract_time_period(searchable_text)
-    actions = _extract_matching_lines(
-        lines,
-        r"\b(built|created|developed|implemented|designed|improved|optimized|deployed|tested|collaborated|automated|analyzed)\b",
-    )
-    impact = _extract_matching_lines(
-        lines,
-        r"\b(improved|reduced|increased|saved|enabled|supported|impact|result|outcome)\b",
-    )
-    metrics = _extract_metrics(lines)
-    technologies = _extract_keywords(searchable_text, TECHNOLOGY_KEYWORDS)
-    role_types = _infer_categories(searchable_text, ROLE_TYPE_RULES)
-    skills = _infer_categories(searchable_text, SKILL_RULES)
-    domain_keywords = _infer_categories(searchable_text, DOMAIN_RULES)
-    uncertain_points = _build_uncertain_points(title, company, time_period, actions, impact)
-    confidence = _calculate_confidence(title, company, actions, technologies)
+class RuleBasedExperienceStructurer:
+    """Conservative local fallback for explicit raw-note extraction."""
 
-    draft = ExperienceDraft(
-        id=draft_id,
-        title=title,
-        company=company,
-        time_period=time_period,
-        context=_extract_labeled_value(lines, ("context", "background")),
-        problem=_extract_labeled_value(lines, ("problem", "challenge")),
-        role=_extract_labeled_value(lines, ("role", "position")),
-        actions=actions,
-        technologies=technologies,
-        impact=impact,
-        metrics=metrics,
-        role_types=role_types,
-        skills=skills,
-        domain_keywords=domain_keywords,
-        possible_resume_angles=_build_resume_angles(role_types, skills),
-        raw_bullets=lines,
-        truth_constraints=[
-            "Use only claims explicitly supported by the raw note.",
-            "Do not invent metrics, technologies, responsibilities, or outcomes.",
-            "Review uncertain_points before merging this draft into an experience bank.",
-        ],
-        uncertain_points=uncertain_points,
-        confidence=confidence,
-        usable_for=role_types,
-    )
-    return draft.to_dict()
+    name = "rule_based"
+    model = None
+
+    def structure(
+        self,
+        raw_note: str,
+        draft_id: str,
+        evidence: ExtractedEvidence | None = None,
+    ) -> dict[str, object]:
+        validate_raw_experience_note(raw_note)
+        clean_note = RawNotePreprocessor().preprocess(raw_note)
+        extracted_evidence = evidence or EvidenceExtractor().extract(clean_note)
+        lines = extracted_evidence.evidence_lines
+        searchable_text = " ".join(lines)
+        title = _english_safe_value(_extract_labeled_value(lines, ("title", "project", "experience")))
+        company = _english_safe_value(_extract_labeled_value(lines, ("company", "employer", "organization")))
+        time_period = _extract_time_period(searchable_text)
+        actions = _english_safe_lines(extracted_evidence.action_lines)
+        impact = _english_safe_lines(extracted_evidence.impact_lines)
+        metrics = _english_safe_lines(extracted_evidence.metric_lines)
+        technologies = extracted_evidence.technologies
+        role_types = _infer_categories(searchable_text, ROLE_TYPE_RULES)
+        skills = _infer_categories(searchable_text, SKILL_RULES)
+        domain_keywords = _infer_categories(searchable_text, DOMAIN_RULES)
+        uncertain_points = _build_uncertain_points(title, company, time_period, actions, impact)
+        if any(not _is_english_safe(line) for line in extracted_evidence.evidence_lines):
+            uncertain_points.append(
+                "Review the original non-English evidence lines with the AI structurer or translate them manually."
+            )
+
+        draft = ExperienceDraft(
+            id=draft_id,
+            status="draft",
+            source=DraftSource(
+                type="raw_experience_note",
+                created_at=_current_timestamp(),
+                structurer=self.name,
+                model=self.model,
+            ),
+            title=title,
+            company=company,
+            time_period=time_period,
+            context=_english_safe_value(_extract_labeled_value(lines, ("context", "background"))),
+            problem=_english_safe_value(_extract_labeled_value(lines, ("problem", "challenge"))),
+            role=_english_safe_value(_extract_labeled_value(lines, ("role", "position"))),
+            actions=actions,
+            technologies=technologies,
+            impact=impact,
+            metrics=metrics,
+            role_types=role_types,
+            skills=skills,
+            domain_keywords=domain_keywords,
+            possible_resume_angles=_build_resume_angles(role_types, skills),
+            evidence=DraftEvidence(
+                action_lines=extracted_evidence.action_lines,
+                metric_lines=extracted_evidence.metric_lines,
+                technology_lines=extracted_evidence.technology_lines,
+            ),
+            evidence_lines=lines,
+            draft_bullets=[],
+            truth_constraints=[
+                "Use only claims explicitly supported by the raw note.",
+                "Do not invent metrics, technologies, ownership, responsibilities, or outcomes.",
+                "Review uncertain_points before merging this draft into an experience bank.",
+            ],
+            uncertain_points=uncertain_points,
+            confidence=DraftConfidence(
+                metrics=_confidence_for_presence(metrics),
+                tools=_confidence_for_presence(technologies),
+                ownership=_confidence_for_presence(actions),
+                impact=_confidence_for_presence(impact),
+            ),
+            usable_for=role_types,
+        )
+        return draft.to_dict()
+
+
+def structure_experience_note(raw_note: str, draft_id: str) -> dict[str, object]:
+    """Backwards-compatible wrapper for the default local structurer."""
+    clean_note = RawNotePreprocessor().preprocess(raw_note)
+    evidence = EvidenceExtractor().extract(clean_note)
+    return RuleBasedExperienceStructurer().structure(clean_note, draft_id, evidence)
 
 
 def _extract_labeled_value(lines: list[str], labels: tuple[str, ...]) -> str | None:
@@ -137,21 +146,16 @@ def _extract_time_period(text: str) -> str | None:
     return match.group(0) if match else None
 
 
-def _extract_matching_lines(lines: list[str], pattern: str) -> list[str]:
-    return [line for line in lines if re.search(pattern, line, re.IGNORECASE)]
+def _english_safe_value(value: str | None) -> str | None:
+    return value if value is not None and _is_english_safe(value) else None
 
 
-def _extract_metrics(lines: list[str]) -> list[str]:
-    metric_pattern = r"(?:\b\d+(?:\.\d+)?%|\$\d+|\b\d+(?:\.\d+)?\s*(?:users?|records?|hours?|minutes?|seconds?|requests?|items?)\b)"
-    return [line for line in lines if re.search(metric_pattern, line, re.IGNORECASE)]
+def _english_safe_lines(lines: list[str]) -> list[str]:
+    return [line for line in lines if _is_english_safe(line)]
 
 
-def _extract_keywords(text: str, keywords: list[str]) -> list[str]:
-    return [
-        keyword
-        for keyword in keywords
-        if re.search(rf"(?<![A-Za-z0-9+#]){re.escape(keyword)}(?![A-Za-z0-9+#])", text, re.IGNORECASE)
-    ]
+def _is_english_safe(value: str) -> bool:
+    return value.isascii()
 
 
 def _infer_categories(text: str, rules: dict[str, tuple[str, ...]]) -> list[str]:
@@ -188,15 +192,9 @@ def _build_uncertain_points(
     return uncertain_points
 
 
-def _calculate_confidence(
-    title: str | None,
-    company: str | None,
-    actions: list[str],
-    technologies: list[str],
-) -> str:
-    explicit_field_count = sum([title is not None, company is not None, bool(actions), bool(technologies)])
-    if explicit_field_count >= 4:
-        return "high"
-    if explicit_field_count >= 2:
-        return "medium"
-    return "low"
+def _confidence_for_presence(values: list[str]) -> str:
+    return "high" if values else "low"
+
+
+def _current_timestamp() -> str:
+    return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")

@@ -1,0 +1,37 @@
+{
+  "technologies": [
+    "Python",
+    "Java",
+    "JavaScript",
+    "TypeScript",
+    "Next.js",
+    "Figma",
+    "MCP",
+    "React",
+    "Vue",
+    "Vite",
+    "Angular",
+    "Node",
+    "SQL",
+    "PostgreSQL",
+    "MySQL",
+    "AWS",
+    "Azure",
+    "GCP",
+    "Docker",
+    "Kubernetes",
+    "Git",
+    "Linux",
+    "C++",
+    "C#",
+    "HTML",
+    "CSS",
+    "REST",
+    "GraphQL",
+    "Terraform",
+    "Jenkins"
+    ,
+    "Dokploy",
+    "WeChat Pay"
+  ]
+}

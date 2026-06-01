@@ -13,7 +13,10 @@
 
 {{ opening_paragraph }}
 
-{{ body_paragraph }}
+{% for paragraph in body_paragraphs %}
+{{ paragraph }}
+
+{% endfor %}
 
 {{ closing_paragraph }}
 

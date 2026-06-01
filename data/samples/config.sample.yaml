@@ -1,0 +1,48 @@
+ai:
+  models:
+    cheap: gpt-4.1-nano
+    balanced: gpt-4.1-mini
+    strong_mini: gpt-5.4-mini
+    strong: gpt-5.4
+    premium: gpt-5.5
+
+  tasks:
+    jd_analysis:
+      model: balanced
+      temperature: 0.1
+      max_output_tokens: 1500
+
+    resume_strategy:
+      model: balanced
+      temperature: 0.1
+      max_output_tokens: 1000
+
+    resume_selection:
+      model: balanced
+      temperature: 0.1
+      max_output_tokens: 1000
+
+    cover_letter_decision:
+      model: balanced
+      temperature: 0.1
+      max_output_tokens: 800
+
+    cover_letter_evidence_selection:
+      model: strong_mini
+      temperature: 0.1
+      max_output_tokens: 1200
+
+    cover_letter_outline:
+      model: strong_mini
+      temperature: 0.2
+      max_output_tokens: 1200
+
+    cover_letter_writer:
+      model: strong
+      temperature: 0.35
+      max_output_tokens: 1800
+
+    cover_letter_review:
+      model: strong_mini
+      temperature: 0.1
+      max_output_tokens: 1200
