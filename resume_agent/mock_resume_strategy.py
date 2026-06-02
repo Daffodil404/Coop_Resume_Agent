@@ -11,6 +11,7 @@ class MockResumeStrategyClient:
         recommended_base, reason = _select_resume_base(searchable_text)
         return {
             "recommended_resume_base": recommended_base,
+            "target_company": jd_analysis.get("company"),
             "selection_reason": reason,
             "strategy_source": "mock_rule_based",
         }
